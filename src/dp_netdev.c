@@ -54,12 +54,49 @@ int dp_netdev_open(dp_netdev_t *dev, const char *if_name, int is_tun)
 
 int dp_netdev_read(dp_netdev_t *dev, uint8_t *buf, size_t len){
 
+    ssize_t nread;
+    if (dev == NULL){
+        return -1;
+    }
+    nread = read(dev->fd, buf, len);
+
+    if (nread < 0)
+    {
+        return -1;
+    }
+
+    return nread;
+
 }
 
 int dp_netdev_write(dp_netdev_t *dev, const uint8_t *buf, size_t len){
+    ssize_t nwritten;
+    if (dev == NULL){
+        return -1;
+    }
 
+    nwritten = write(dev->fd, buf, len);
+
+    if (nwritten < 0)
+    {
+        return -1;
+    }
+
+    return nwritten;
 }
 
 int dp_netdev_close(dp_netdev_t *dev){
+    if (dev == NULL)
+    {
+        return -1;
+    }
 
+    int closeRes = close(dev->fd);
+
+    if (closeRes < 0 ){
+        return -1;
+    }
+    dev->mtu = 0;
+    memset(dev->name, 0, sizeof(dev->name));
+    return 0;
 }

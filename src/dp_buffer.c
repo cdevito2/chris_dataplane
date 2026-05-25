@@ -34,7 +34,7 @@ void dp_buf_free(dp_buf_t *buf)
             free(buf->data);
             buf->data = NULL;
         }
-        free(buf);
+        //free(buf);
     }
 }
 
