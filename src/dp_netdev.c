@@ -98,5 +98,6 @@ int dp_netdev_close(dp_netdev_t *dev){
     }
     dev->mtu = 0;
     memset(dev->name, 0, sizeof(dev->name));
+    
     return 0;
 }

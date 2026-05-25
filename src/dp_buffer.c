@@ -1,4 +1,6 @@
 #include "dp_buffer.h"
+#include <stdlib.h>
+#include <string.h>
 
 dp_buf_t *dp_buf_alloc(size_t capacity)
 {
@@ -34,11 +36,11 @@ void dp_buf_free(dp_buf_t *buf)
             free(buf->data);
             buf->data = NULL;
         }
-        //free(buf);
+        free(buf);
     }
 }
 
-void db_buf_reset(dp_buf_t *buf)
+void dp_buf_reset(dp_buf_t *buf)
 {
     if (buf == NULL){
         return;
