@@ -1,6 +1,8 @@
 #ifndef __LOG__
 #define __LOG__
 
+#include <stdio.h>
+
 typedef enum {
     LOG_DEBUG = 0,
     LOG_INFO,

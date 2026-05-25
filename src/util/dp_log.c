@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include "dp_log.h"
 #include <time.h>
 #include <stdarg.h>
@@ -36,8 +37,8 @@ void dp_log(dp_log_level_t level, const char *fmt, ...)
     time_t now = time(NULL);
 
     //convert epoch to local time
-    struct tm *tm_now;
-    tm_now = localtime(&now);
+    struct tm tm_now;
+    localtime_r(&now, &tm_now);
 
     //log buffer
     char ts[32];
