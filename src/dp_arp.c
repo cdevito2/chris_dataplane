@@ -20,9 +20,12 @@ int dp_arp_lookup(uint32_t ip_addr, uint8_t *mac_addr_out)
 {
     // Lookup IP address in ARP cache and return corresponding MAC address
     // Return 1 on success 0 failure
+    if (mac_addr_out == NULL) {
+        return 0;
+    }
     for (int i=0;i<32;i++)
     {
-        if (arp_cache[i].ip_addr == ip_addr)
+        if (arp_cache[i].ip_addr == ntohl(ip_addr))
         {
             memcpy(mac_addr_out, arp_cache[i].mac_addr, 6);
             return 1;   
@@ -31,12 +34,12 @@ int dp_arp_lookup(uint32_t ip_addr, uint8_t *mac_addr_out)
     return 0; 
 }
 
-void dp_arp_insert(uint32_t ip_addr, uint8_t *mac_addr)
+void dp_arp_insert(uint32_t ip_addr, const uint8_t *mac_addr)
 {
     // Insert IP address and MAC address into ARP cache
     for (int i=0;i<32;i++)
     {
-        if (arp_cache[i].ip_addr == ip_addr)
+        if (arp_cache[i].ip_addr == ntohl(ip_addr))
         {
             //update existing entry
             memcpy(arp_cache[i].mac_addr, mac_addr, 6);
@@ -45,9 +48,9 @@ void dp_arp_insert(uint32_t ip_addr, uint8_t *mac_addr)
         }
         else if (arp_cache[i].ip_addr == 0)
         {
-            arp_cache[i].ip_addr = ip_addr;
+            arp_cache[i].ip_addr = ntohl(ip_addr);
             memcpy(arp_cache[i].mac_addr, mac_addr, 6);
-            arp_cache[i].timestamp = time(NULL);
+            arp_cache[i].timestamp = time(NULL); //Chris TODO: add arp aging 
             return;
         }
     }
@@ -81,6 +84,11 @@ void dp_arp_handle_request(dp_netdev_t *dev, dp_buf_t *buf, dp_eth_frame_t *eth_
         return; // Invalid IP length
     }
 
+    if (ntohs(arp_hdr->op_code) == 2) //check if it's an arp reqly
+    {
+        dp_arp_insert(arp_hdr->src_ip, arp_hdr->src_mac); //update cache with sender info
+        return;
+    }
     if (ntohs(arp_hdr->op_code) != 1) //check if it's an arp request
     {
         return; //not an arp request, ignore
@@ -90,9 +98,7 @@ void dp_arp_handle_request(dp_netdev_t *dev, dp_buf_t *buf, dp_eth_frame_t *eth_
     dp_arp_insert(arp_hdr->src_ip, arp_hdr->src_mac);
 
     //check if this is an arp request for our ip
-    uint32_t our_ip = 0xC0A80001; //192.    
-
-    if (arp_hdr->dst_ip == our_ip)
+    if (ntohl(arp_hdr->dst_ip) == dev->ip_addr)
     {
         //build arp reply
         arp_hdr->hw_type = htons(1); // Ethernet
@@ -102,29 +108,23 @@ void dp_arp_handle_request(dp_netdev_t *dev, dp_buf_t *buf, dp_eth_frame_t *eth_
         arp_hdr->op_code = htons(2); // ARP Reply
 
         uint32_t sender_ip = arp_hdr->src_ip;
-        uint32_t dest_ip = arp_hdr->dst_ip;
 
-        arp_hdr->src_ip = dest_ip; //our ip is the src ip of the reply
+        arp_hdr->src_ip = htonl(dev->ip_addr); //our ip is the src ip of the reply
         arp_hdr->dst_ip = sender_ip; //dst ip is the src ip of the request
 
         uint8_t sender_mac[6];
-        memcpy(sender_mac, arp_hdr->src_mac, 6); //save our mac before
+        memcpy(sender_mac, arp_hdr->src_mac, 6); //sender mac
 
-
-        uint8_t our_mac[6];
-        memcpy(our_mac, eth_hdr->dst_mac, 6); //save sender mac before 
-        //TODO: our_mac is broadcast mac, 
         //we should get our actual mac address
-        
         //from the netdev struct instead of using the dst mac of the request
         
 
-        memcpy(arp_hdr->src_mac, our_mac, 6); //our mac is the src mac of the reply
+        memcpy(arp_hdr->src_mac, dev->mac_addr, 6); //our mac is the src mac of the reply
         memcpy(arp_hdr->dst_mac, sender_mac, 6); //dst mac is the src mac 
 
         //swap ethernet src and dst
-        memcpy(eth_hdr->dst_mac, eth_hdr->src_mac, 6); //dst mac is the src mac of the request
-        memcpy(eth_hdr->src_mac, our_mac, 6); //our mac is the src mac of the reply
+        memcpy(eth_hdr->dst_mac, sender_mac, 6); //dst mac is the src mac of the request
+        memcpy(eth_hdr->src_mac, dev->mac_addr, 6); //our mac is the src mac of the reply
         eth_hdr->ethertype = htons(0x0806); // Ethertype for ARP
 
         //transmit arp reply

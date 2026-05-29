@@ -4,6 +4,8 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include "dp_eth.h"
+#include "dp_arp.h"
 
 static void event_loop(dp_netdev_t *dev)
 {
@@ -35,6 +37,26 @@ static void event_loop(dp_netdev_t *dev)
 
         DP_DEBUG("Read %zu bytes\n", pkt->len);
 
+        // process packet into ethernet/arp 
+        dp_eth_frame_t eth_frame;
+        if (dp_eth_parse(pkt, &eth_frame) != 0) {
+            DP_WARN("Failed to parse Ethernet frame\n");
+            continue;
+        }
+
+        //else now we have eth frame struct, we can log it and then check if it's an arp packet
+        dp_eth_log_frame(&eth_frame);
+
+        switch(ntohs(eth_frame.hdr.ethertype))
+        {
+            case 0x0806: //arp
+                dp_arp_handle_request(dev, pkt, &eth_frame);
+                break;
+            default:
+                DP_DEBUG("Unsupported ethertype: 0x%04x\n", ntohs(eth_frame.hdr.ethertype));
+                break;
+        }
+        /*
         // Echo packet back out
         int write_rc = dp_netdev_write(dev, pkt->data, pkt->len);
 
@@ -44,6 +66,7 @@ static void event_loop(dp_netdev_t *dev)
         }
 
         DP_DEBUG("Wrote %d bytes\n", write_rc);
+        */
     }
 
     DP_INFO("Event loop stopped\n");
